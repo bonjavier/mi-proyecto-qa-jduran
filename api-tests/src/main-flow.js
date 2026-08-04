@@ -70,9 +70,9 @@ export default function () {
   // Nota: DummyJSON es un mock — POST/PUT/DELETE simulan la operación y
   // devuelven un objeto coherente, pero NO persisten. Un GET posterior por
   // id no reflejará el cambio (el creado no existirá, el editado no tendrá
-  // el nuevo valor). Por eso cada mutación se valida contra su propia
+  // el nuevo valor). Por eso cada operación se valida contra su propia
   // respuesta inmediata, nunca releyendo el recurso después.
-  group('04 - Mutaciones (comportamiento MOCK)', function () {
+  group('04 - Crea - Actualiza - Borra (comportamiento MOCK)', function () {
     // Payload dinámico: varía por VU/iteración para no repetir el mismo
     // valor en corridas con más de 1 VU o iteración.
     const uniqueSuffix = `${__VU}-${__ITER}-${Date.now()}`;

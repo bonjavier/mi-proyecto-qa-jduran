@@ -90,7 +90,7 @@ xdg-open target/site/serenity/index.html
 
 ## Suite de API (k6)
 
-Pruebas de API en **k6** (JavaScript) contra [DummyJSON](https://dummyjson.com): autenticación, lectura y mutaciones (POST/PUT/DELETE), con validación de contrato (JSON Schema) y SLA de rendimiento. Incluye además una prueba de carga pequeña sobre los mismos endpoints críticos.
+Pruebas de API en **k6** (JavaScript) contra [DummyJSON](https://dummyjson.com): autenticación, lectura y operaciones de creación/actualización/borrado (POST/PUT/DELETE), con validación de contrato (JSON Schema) y SLA de rendimiento. Incluye además una prueba de carga pequeña sobre los mismos endpoints críticos.
 
 ### Prerrequisitos
 
@@ -128,7 +128,7 @@ k6 version
 api-tests/
 ├── run.sh                 # orquestador: funcional / carga / ambos condicionados
 ├── src/
-│   ├── main-flow.js       # validación funcional (login → auth user → user → mutaciones)
+│   ├── main-flow.js       # validación funcional (login → auth user → user → crea/actualiza/borra)
 │   ├── load-test.js       # prueba de carga sobre los mismos endpoints críticos
 │   ├── config/env.js      # BASE_URL, credenciales, SLA_MS (sobreescribibles por entorno)
 │   ├── schemas/           # contratos por endpoint (loginSchema, userSchema, addUserSchema)

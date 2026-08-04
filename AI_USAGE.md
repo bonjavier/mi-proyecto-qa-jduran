@@ -15,7 +15,7 @@
 **Capa de API (k6 + JavaScript):**
 - Generación del andamiaje del proyecto (config centralizada, schemas por endpoint, helpers de aserciones reutilizables).
 - Resolución del problema de validación de JSON Schema en el runtime de k6 (`goja`, no Node/npm) — ver prompt (b) abajo.
-- Implementación del flujo E2E híbrido (login → usuario autenticado → usuario por id → mutaciones), con verificación empírica previa de cada endpoint contra la API real (no se asumió el contrato descrito en el prompt sin comprobarlo).
+- Implementación del flujo E2E híbrido (login → usuario autenticado → usuario por id → crear/actualizar/borrar), con verificación empírica previa de cada endpoint contra la API real (no se asumió el contrato descrito en el prompt sin comprobarlo).
 - Configuración de thresholds de SLA (`p(95)<1500ms`) y generación de reporte HTML/JSON vía `k6-reporter`, incluyendo un escenario de demostración que falla el SLA a propósito (`?delay=2000`).
 - Redacción de los README de cada módulo y de esta bitácora.
 
@@ -23,7 +23,7 @@
 
 ### (a) Prompt maestro para la suite de API en k6
 
-Este prompt aportó valor significativo porque fijó de antemano el contrato verificado de la API (endpoints singular/plural de auth, comportamiento mock de las mutaciones), evitando que el modelo alucinara persistencia donde no la hay o confundiera `/user/login` con `/users/login`:
+Este prompt aportó valor significativo porque fijó de antemano el contrato verificado de la API (endpoints singular/plural de auth, comportamiento mock de las operaciones de creación/actualización/borrado), evitando que el modelo alucinara persistencia donde no la hay o confundiera `/user/login` con `/users/login`:
 
 > Actúa como QA Automation Engineer senior. Vamos a construir una suite de pruebas de API en k6 (JavaScript) para una prueba técnica de automatización QA. Te doy TODO el contexto y el plan completo en este mensaje. Trabaja de forma incremental y ordenada, pero ya tienes autorización para ejecutar todos los pasos en esta sesión.
 >
