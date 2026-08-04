@@ -36,11 +36,15 @@ k6 version
 
 ```
 api-tests/
+├── run.sh                 # orquestador: funcional / carga / ambos condicionados
 ├── src/
-│   ├── main-flow.js       # script principal (login → auth user → user → mutaciones)
+│   ├── main-flow.js       # validación funcional (login → auth user → user → mutaciones)
+│   ├── load-test.js       # prueba de carga sobre los mismos endpoints críticos
 │   ├── config/env.js      # BASE_URL, credenciales, SLA_MS (sobreescribibles por entorno)
 │   ├── schemas/           # contratos por endpoint (loginSchema, userSchema, addUserSchema)
-│   └── helpers/checks.js  # aserciones reutilizables: status, SLA, schema, headers
+│   └── helpers/
+│       ├── checks.js      # aserciones reutilizables: status, SLA, schema, headers
+│       └── report.js      # generación de reporte HTML/JSON (compartido por ambos scripts)
 └── reports/                # salida de reportes (generada al correr la suite)
 ```
 
@@ -54,32 +58,53 @@ k6 run -e BASE_URL=https://dummyjson.com -e API_USERNAME=emilys -e API_PASSWORD=
 
 ## Ejecutar la suite
 
-Desde `api-tests/`:
+Desde `api-tests/` (en Windows, vía Git Bash: `bash run.sh ...`):
+
+### Solo validación funcional (consumir/validar los endpoints)
 
 ```bash
-k6 run src/main-flow.js
+./run.sh functional
+# equivalente directo: k6 run src/main-flow.js
 ```
 
-Esto corre el flujo completo (2 VUs × 2 iteraciones) y valida los thresholds de SLA y de tasa de checks exitosos.
+Corre el flujo completo (2 VUs × 2 iteraciones) y valida status, headers, contrato y SLA por endpoint. Reporte: `reports/functional-summary.html`.
+
+### Solo prueba de carga
+
+```bash
+./run.sh load
+# equivalente directo: k6 run src/load-test.js
+```
+
+Carga pequeña y deliberadamente conservadora (ramp-up 10s → 5 VUs, sostenido 20s → 10 VUs, ramp-down 10s) sobre los mismos endpoints críticos (login, lectura, escritura). Reporte: `reports/load-summary.html`.
+
+### Ambas, condicionadas (recomendado para demo/video)
+
+```bash
+./run.sh all
+# o simplemente: ./run.sh
+```
+
+Corre primero la validación funcional. **Si pasa**, lanza la prueba de carga a continuación. **Si falla**, la carga no se ejecuta — no tiene sentido cargar endpoints que ya sabemos que están rotos — y el reporte funcional queda regenerado reflejando el error, listo para inspeccionar.
+
+Puedes reenviar flags de k6 después del modo, por ejemplo para forzar un fallo controlado y verificar el gate:
+```bash
+./run.sh all -e API_PASSWORD=credencial-incorrecta
+```
 
 ### Escenario de demostración de SLA (falla a propósito)
 
-Suma un quinto grupo (`05 - DEMO`) al flujo normal, con una petición `?delay=2000` que fuerza una respuesta lenta para demostrar que la aserción de SLA realmente detecta degradación (no solo "compila"). Va en el mismo reporte que el resto de checks, no en una corrida aparte — así se ve el contraste entre lo que pasa y lo que falla:
+Dentro de `main-flow.js`, suma un quinto grupo (`05 - DEMO`) al flujo funcional, con una petición `?delay=2000` que fuerza una respuesta lenta para demostrar que la aserción de SLA realmente detecta degradación (no solo "compila"). Va en el mismo reporte que el resto de checks, no en una corrida aparte:
 
 ```bash
-k6 run -e RUN_DELAY_DEMO=true src/main-flow.js
+./run.sh functional -e RUN_DELAY_DEMO=true
 ```
 
 Este comando **debe terminar con código de salida distinto de cero** (threshold `checks: rate>0.99` incumplido) — es el comportamiento esperado. Por defecto (sin la variable), el grupo de demo no se ejecuta y la corrida queda 100% en verde.
 
-### Generar el reporte HTML
+### Reportes HTML
 
-Se genera automáticamente en cada corrida (vía [k6-reporter](https://github.com/benc-uk/k6-reporter), importado por URL, sin necesidad de Node/npm):
-
-```bash
-k6 run src/main-flow.js
-# abrir reports/summary.html
-```
+Se generan automáticamente en cada corrida (vía [k6-reporter](https://github.com/benc-uk/k6-reporter), importado por URL, sin necesidad de Node/npm): `reports/functional-summary.html` y `reports/load-summary.html`, cada uno con su propio `.json` equivalente.
 
 ## Decisiones de diseño
 

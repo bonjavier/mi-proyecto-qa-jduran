@@ -1,12 +1,11 @@
 import http from 'k6/http';
 import { group, check } from 'k6';
-import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
-import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 import { BASE_URL, CREDENTIALS, SLA_MS } from './config/env.js';
 import { loginSchema } from './schemas/loginSchema.js';
 import { userSchema } from './schemas/userSchema.js';
 import { addUserSchema } from './schemas/addUserSchema.js';
 import { checkStatus, checkSLA, checkSchema, checkHeader } from './helpers/checks.js';
+import { buildSummary } from './helpers/report.js';
 
 export const options = {
   vus: 2,
@@ -139,9 +138,5 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  return {
-    'reports/summary.html': htmlReport(data),
-    'reports/summary.json': JSON.stringify(data, null, 2),
-    stdout: textSummary(data, { indent: ' ', enableColors: true }),
-  };
+  return buildSummary(data, 'functional-summary');
 }
