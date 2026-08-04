@@ -64,13 +64,13 @@ Esto corre el flujo completo (2 VUs × 2 iteraciones) y valida los thresholds de
 
 ### Escenario de demostración de SLA (falla a propósito)
 
-Hace una petición con `?delay=2000` para forzar una respuesta lenta y demostrar que la aserción de SLA realmente detecta degradación (no solo "compila"). Está separado del flujo principal para no romper la corrida normal:
+Suma un quinto grupo (`05 - DEMO`) al flujo normal, con una petición `?delay=2000` que fuerza una respuesta lenta para demostrar que la aserción de SLA realmente detecta degradación (no solo "compila"). Va en el mismo reporte que el resto de checks, no en una corrida aparte — así se ve el contraste entre lo que pasa y lo que falla:
 
 ```bash
-k6 run --vus 1 --iterations 1 -e RUN_DELAY_DEMO=true src/main-flow.js
+k6 run -e RUN_DELAY_DEMO=true src/main-flow.js
 ```
 
-Este comando **debe terminar con código de salida distinto de cero** (threshold de SLA incumplido) — es el comportamiento esperado.
+Este comando **debe terminar con código de salida distinto de cero** (threshold `checks: rate>0.99` incumplido) — es el comportamiento esperado. Por defecto (sin la variable), el grupo de demo no se ejecuta y la corrida queda 100% en verde.
 
 ### Generar el reporte HTML
 

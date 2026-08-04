@@ -22,19 +22,6 @@ export const options = {
 };
 
 export default function () {
-  // Escenario de demostración de SLA negativo: se activa solo bajo demanda
-  // (k6 run -e RUN_DELAY_DEMO=true ...) para no romper la corrida principal.
-  if (__ENV.RUN_DELAY_DEMO === 'true') {
-    group('DEMO - SLA negativo (?delay=2000)', function () {
-      const res = http.get(`${BASE_URL}/users/1?delay=2000`);
-      checkStatus(res, 200, 'DEMO - delay');
-      // Este check DEBE fallar: demuestra que la aserción de SLA detecta
-      // una respuesta lenta real, no solo que "compila".
-      checkSLA(res, 'DEMO - delay');
-    });
-    return;
-  }
-
   let accessToken;
 
   group('01 - Login', function () {
@@ -135,6 +122,20 @@ export default function () {
       '04 - DELETE users/1: deletedOn is present': () => !!deleteBody.deletedOn,
     });
   });
+
+  // Escenario de demostración de SLA negativo: se suma al flujo normal solo
+  // bajo demanda (k6 run -e RUN_DELAY_DEMO=true ...), para que el mismo
+  // reporte muestre checks en verde junto a una falla real, en vez de
+  // generar una corrida aparte que sobrescribe el reporte completo.
+  if (__ENV.RUN_DELAY_DEMO === 'true') {
+    group('05 - DEMO - SLA negativo (?delay=2000)', function () {
+      const res = http.get(`${BASE_URL}/users/1?delay=2000`);
+      checkStatus(res, 200, '05 - DEMO - delay');
+      // Este check DEBE fallar: demuestra que la aserción de SLA detecta
+      // una respuesta lenta real, no solo que "compila".
+      checkSLA(res, '05 - DEMO - delay');
+    });
+  }
 }
 
 export function handleSummary(data) {
