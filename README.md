@@ -68,7 +68,18 @@ $env:NO_RESET = "false"
 
 ### Reportes
 
-Serenity genera el reporte HTML en `target/site/serenity/index.html` al finalizar la ejecución.
+Serenity genera el reporte HTML en `target/site/serenity/index.html` al finalizar la ejecución. Para abrirlo (desde la raíz del repo):
+
+```powershell
+start target/site/serenity/index.html
+```
+
+```bash
+# macOS
+open target/site/serenity/index.html
+# Linux
+xdg-open target/site/serenity/index.html
+```
 
 ### Casos cubiertos
 
@@ -193,6 +204,20 @@ Este comando **debe terminar con código de salida distinto de cero** (threshold
 ### Reportes HTML
 
 Se generan automáticamente en cada corrida (vía [k6-reporter](https://github.com/benc-uk/k6-reporter), importado por URL, sin necesidad de Node/npm): `reports/functional-summary.html` y `reports/load-summary.html`, cada uno con su propio `.json` equivalente.
+
+Para abrirlos (desde `api-tests/`):
+
+```powershell
+start reports/functional-summary.html
+start reports/load-summary.html
+```
+
+```bash
+# Git Bash / macOS / Linux
+open reports/functional-summary.html   # macOS
+xdg-open reports/functional-summary.html # Linux
+start reports/functional-summary.html    # Git Bash en Windows también acepta "start"
+```
 
 ### Decisiones de diseño
 
