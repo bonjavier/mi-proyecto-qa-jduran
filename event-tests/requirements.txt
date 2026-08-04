@@ -1,0 +1,7 @@
+# kafka-python (el paquete original en PyPI) tiene un bug de compatibilidad
+# conocido con Python 3.12+ (falla al importar kafka.vendor.six.moves).
+# kafka-python-ng es el fork mantenido activamente que lo corrige; expone
+# el mismo namespace `kafka` así que el código no cambia en nada.
+kafka-python-ng==2.2.3
+pytest==8.3.3
+jsonschema==4.23.0

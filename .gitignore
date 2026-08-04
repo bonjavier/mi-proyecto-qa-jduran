@@ -40,3 +40,8 @@ local_sdk/
 api-tests/reports/*
 !api-tests/reports/.gitkeep
 node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

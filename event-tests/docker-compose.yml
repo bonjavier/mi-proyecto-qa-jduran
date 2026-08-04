@@ -1,0 +1,52 @@
+# Kafka local, ligero, en modo KRaft (sin Zookeeper).
+#
+# Un único contenedor cumple DOS roles a la vez:
+#   - "broker": recibe/guarda/entrega mensajes (lo que usan producer y consumer).
+#   - "controller": coordina metadata del clúster (quién es el líder de cada
+#     partición, etc.) — esto es lo que antes hacía Zookeeper por separado.
+# Combinar ambos roles en un solo proceso es válido y recomendado para
+# desarrollo local; en producción se separarían en varios nodos.
+services:
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka-local
+    ports:
+      # Puerto donde el broker escucha conexiones de clientes (producer/consumer)
+      # desde FUERA del contenedor, ej. tu script de Python en Windows.
+      - "9092:9092"
+    environment:
+      # Identificador único de este nodo dentro del "clúster" (aunque solo hay uno).
+      KAFKA_NODE_ID: 1
+
+      # Este nodo actúa como broker Y como controller (ver comentario arriba).
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # Listeners = direcciones en las que el proceso escucha.
+      # PLAINTEXT (9092): para clientes normales (producer/consumer), sin cifrar
+      #   (aceptable en local; en producción se usaría TLS).
+      # CONTROLLER (9093): canal interno para la coordinación KRaft, no lo usan
+      #   producer/consumer directamente.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # La dirección que el broker "anuncia" a los clientes para que sepan a
+      # dónde conectarse realmente. Como el contenedor se accede desde tu
+      # máquina vía localhost:9092 (por el mapeo de puertos de arriba), debe
+      # decir exactamente eso — si dijera el nombre interno del contenedor,
+      # tu script de Python (fuera de Docker) no podría resolverlo.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # Con un solo broker, el factor de replicación de los tópicos internos
+      # de Kafka (offsets, etc.) tiene que ser 1 — no hay a dónde replicar.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Quién participa en la elección de "controller" (solo el nodo 1, en
+      # su puerto 9093). Formato: <node_id>@<host>:<puerto_controller>.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-local:9093
+
+      # ID único del "clúster" KRaft. Kafka lo exige para formatear el
+      # almacenamiento la primera vez que arranca; cualquier string base64
+      # válido de 22 caracteres sirve para desarrollo local.
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw

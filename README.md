@@ -6,10 +6,14 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 .
 ├── src/                # suite móvil (Java/Screenplay/Serenity/Cucumber)
 ├── 2-sauceLabs.apk     # APK del SUT
-└── api-tests/           # suite de API (k6)
-    ├── run.sh
-    ├── src/
-    └── reports/
+├── api-tests/           # suite de API (k6)
+│   ├── run.sh
+│   ├── src/
+│   └── reports/
+└── event-tests/          # bonus: Kafka (Python + Docker)
+    ├── docker-compose.yml
+    ├── schemas/
+    └── test_gps_events.py
 ```
 
 ---
@@ -264,3 +268,86 @@ start reports/functional-summary.html    # Git Bash en Windows también acepta "
 **Por qué la corrida funcional puede fallar ocasionalmente por SLA con solo 2 iteraciones:** la primera petición de cada proceso de k6 puede tardar varios segundos por costo de "cold start" (nueva conexión TLS, a veces inspeccionada por antivirus/firewall local) — no es una petición HTTP lenta en sí. Con solo 2 iteraciones (12 peticiones), un único outlier de este tipo puede dominar el cálculo de `p(95)` y romper el threshold. Es una limitación estadística esperada de una muestra tan pequeña, no un defecto de la suite: los checks de status, headers y contrato pasan siempre; si ves fallar únicamente `response time < 1500ms` en el primer grupo (Login), es este caso. `load-test.js` no sufre esto porque corre muchas más iteraciones.
 
 **Por qué la carga es pequeña y conservadora:** DummyJSON es una API pública compartida (sandbox de terceros), no infraestructura propia — no correspondería someterla a una carga real. El objetivo de `load-test.js` es demostrar el patrón (ramp-up/sostenido/ramp-down, thresholds bajo carga), no un benchmark de capacidad.
+
+---
+
+## Bonus: Eventos (Kafka)
+
+Prueba de integración con Apache Kafka: publica un evento de telemetría GPS y lo consume de vuelta en el mismo test, validando integridad, contrato de datos (JSON Schema) y rangos válidos.
+
+### Prerrequisitos
+
+- **Docker Desktop** (con WSL2 activo en Windows — ver sección "Prerrequisitos y Stack" más arriba)
+- **Python 3.9+**
+
+```powershell
+docker --version
+python --version
+```
+
+### 1. Levantar Kafka
+
+```bash
+cd event-tests
+docker compose up -d
+```
+
+Verificar que quedó arriba:
+```bash
+docker ps                          # kafka-local debe aparecer como "Up"
+docker logs kafka-local --tail 10  # debe terminar en "Kafka Server started"
+```
+
+### 2. Instalar dependencias de Python
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 3. Correr el test
+
+```bash
+python -m pytest test_gps_events.py -v
+```
+
+Debería terminar en `1 passed`. El test:
+1. Publica `{"vehicleId":"VEH-99","lat":4.60,"lng":-74.08,"speed":65}` en el tópico `gps-raw-events`.
+2. Lo consume de vuelta.
+3. Valida que sea idéntico a lo enviado, que cumpla el contrato de datos, que los rangos (lat/lng/speed) sean físicamente válidos, y que haya llegado dentro del timeout (10s).
+
+### 4. Apagar Kafka al terminar
+
+```bash
+docker compose down
+```
+
+### Estructura
+
+```
+event-tests/
+├── docker-compose.yml        # Kafka local, modo KRaft (sin Zookeeper)
+├── requirements.txt          # kafka-python-ng, pytest, jsonschema
+├── schemas/
+│   └── telemetry_schema.py   # contrato de datos del evento GPS
+└── test_gps_events.py        # test integrado: producer + consumer + validaciones
+```
+
+### Conceptos clave explicados
+
+**Broker** — el servidor de Kafka que recibe, guarda y entrega mensajes. Es el corazón de todo: sin él no hay a dónde publicar ni de dónde leer.
+
+**Tópico** — una categoría/canal con nombre (aquí, `gps-raw-events`) donde se publican mensajes relacionados. Es como el nombre de una carpeta de correo: todos los eventos de telemetría GPS van a ese mismo tópico.
+
+**Producer** — el cliente que publica (envía) mensajes a un tópico. En nuestro test, es quien manda el JSON del vehículo.
+
+**Consumer** — el cliente que lee mensajes de un tópico. Se identifica con un `group_id`: varios consumers con el mismo `group_id` se reparten el trabajo de leer (forman un "grupo de consumo"); consumers con `group_id` distintos leen todos, cada uno por su lado, de forma independiente.
+
+**Offset** — la posición numérica de un mensaje dentro de un tópico (como el número de página de un libro). Kafka recuerda, por cada `group_id`, hasta qué offset ya leyó ese grupo. Por eso este test genera un `group_id` nuevo (un UUID) en cada corrida: así, para Kafka, ese grupo nunca ha leído nada todavía, y con `auto_offset_reset="earliest"` arranca desde el principio del tópico — garantizando que sí vea el mensaje que el test acaba de publicar, sin importar qué corrió antes.
+
+### Decisiones de diseño
+
+**Por qué un test integrado (producer + consumer en el mismo flujo)** en vez de dos tests separados: así el ciclo completo (publicar → leer → validar) se ve de corrido y es más fácil de explicar y demostrar en video, sin depender de que un test anterior haya dejado datos en el tópico.
+
+**Por qué `kafka-python-ng` y no `kafka-python`:** el paquete original (`kafka-python` en PyPI) tiene un bug de compatibilidad conocido con Python 3.12+ (falla al importar `kafka.vendor.six.moves`). `kafka-python-ng` es el fork mantenido activamente que lo corrige, exponiendo el mismo namespace `kafka` — el código de importación no cambia en nada.
+
+**Por qué el consumer reintenta la conexión (hasta 5 veces, con 1s de pausa entre intentos):** se detectó empíricamente (corriendo el test repetidamente, en algunos casos más de 15 veces seguidas) que el selector de sockets de `kafka-python-ng` en Windows falla de forma intermitente con `ValueError: Invalid file descriptor: -1` durante el primer intento de conexión al coordinador del grupo — una condición de carrera de bajo nivel de la librería, no un problema de nuestro tópico/offset (los logs del broker confirman que el grupo sí se forma correctamente del lado del servidor). La frecuencia de la falla aumentó al correr el test muchas veces seguidas en poco tiempo, consistente con acumulación de conexiones TCP en estado `TIME_WAIT` en Windows — un efecto de correr el mismo proceso Python repetidamente en segundos, no algo esperable en un uso normal (una corrida aislada, o en CI). El reintento con una breve pausa lo resuelve siempre.
