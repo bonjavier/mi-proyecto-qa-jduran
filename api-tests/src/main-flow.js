@@ -72,7 +72,7 @@ export default function () {
   // id no reflejará el cambio (el creado no existirá, el editado no tendrá
   // el nuevo valor). Por eso cada operación se valida contra su propia
   // respuesta inmediata, nunca releyendo el recurso después.
-  group('04 - Crea - Actualiza - Borra (comportamiento MOCK)', function () {
+  group('04 - Create - Update - Delete (MOCK behavior)', function () {
     // Payload dinámico: varía por VU/iteración para no repetir el mismo
     // valor en corridas con más de 1 VU o iteración.
     const uniqueSuffix = `${__VU}-${__ITER}-${Date.now()}`;
@@ -127,7 +127,7 @@ export default function () {
   // reporte muestre checks en verde junto a una falla real, en vez de
   // generar una corrida aparte que sobrescribe el reporte completo.
   if (__ENV.RUN_DELAY_DEMO === 'true') {
-    group('05 - DEMO - SLA negativo (?delay=2000)', function () {
+    group('05 - DEMO - Negative SLA (?delay=2000)', function () {
       const res = http.get(`${BASE_URL}/users/1?delay=2000`);
       checkStatus(res, 200, '05 - DEMO - delay');
       // Este check DEBE fallar: demuestra que la aserción de SLA detecta
