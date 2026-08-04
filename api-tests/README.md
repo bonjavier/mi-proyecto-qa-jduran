@@ -58,7 +58,16 @@ k6 run -e BASE_URL=https://dummyjson.com -e API_USERNAME=emilys -e API_PASSWORD=
 
 ## Ejecutar la suite
 
-Desde `api-tests/` (en Windows, vía Git Bash: `bash run.sh ...`):
+`run.sh` es un script bash — en Windows requiere **Git Bash** (viene con Git for Windows; ábrelo desde el menú inicio o clic derecho → "Git Bash Here"). No funciona en PowerShell/CMD directamente.
+
+> **Nota Windows/Git Bash:** dentro de Git Bash, las rutas usan `/` en vez de `\`, y `C:\...` se escribe `/c/...`. Por ejemplo:
+> ```bash
+> cd /c/Users/tatia/OneDrive/Documentos/simon/AppiumJduran-main/api-tests
+> ./run.sh functional
+> ```
+> Si copias una ruta de Windows con `\` tal cual, bash la interpreta como caracteres de escape y la ruta queda rota (`C:UserstatiaOneDrive...`, sin barras). Usa siempre `/` en Git Bash, o pega la ruta entre comillas simples.
+
+Desde `api-tests/`:
 
 ### Solo validación funcional (consumir/validar los endpoints)
 
