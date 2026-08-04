@@ -35,3 +35,8 @@ target/
 
 # Local Android SDK copy (machine-specific, used only by local pipeline scripts)
 local_sdk/
+
+# k6 reports (generated at runtime)
+api-tests/reports/*
+!api-tests/reports/.gitkeep
+node_modules/
