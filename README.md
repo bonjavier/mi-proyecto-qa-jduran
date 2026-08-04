@@ -14,6 +14,40 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 
 ---
 
+## Prerrequisitos y Stack
+
+Herramientas necesarias para todo el proyecto (móvil + API + bonus de Kafka) y para qué se usa cada una. Las versiones de la columna "Versión verificada" son las del entorno donde se desarrolló y probó este repo (Windows 11); cualquier versión reciente equivalente debería funcionar igual.
+
+| Herramienta | Para qué se usa | Versión verificada | Verificar con |
+|---|---|---|---|
+| Git | Versionar y publicar el repositorio | 2.55.0 | `git --version` |
+| Node.js | Appium corre sobre Node; utilidades de apoyo para la capa de API | v24.15.0 | `node --version` |
+| npm | Gestor de paquetes de Node (instala Appium) | 11.12.1 | `npm --version` |
+| k6 | Framework de pruebas de API y de carga | v2.0.0 | `k6 version` |
+| Java 17 (JDK) | Compilar y correr la suite móvil (Gradle/Serenity) | 17.0.12 | `java -version` |
+| Android SDK + Appium 3 + UiAutomator2 | Automatizar la app móvil vía emulador/dispositivo | ver sección "Suite móvil" | `appium -v`, `adb devices` |
+| Python | Scripts productor/consumidor del bonus de Kafka (`kafka-python`) | 3.14.4 | `python --version` |
+| pip | Gestor de paquetes de Python | 26.0.1 | `pip --version` |
+| Docker Desktop | Levantar el broker de Kafka localmente vía `docker-compose` | 29.6.2 | `docker --version`, `docker ps` |
+
+### Nota sobre Docker en Windows: requiere WSL2
+
+Docker Desktop en Windows necesita **WSL2** (Windows Subsystem for Linux, versión 2) como motor de bajo nivel para correr contenedores Linux. Si `docker --version` falla o Docker Desktop no arranca, verifica primero:
+
+```powershell
+wsl --status
+```
+
+Si no está instalado, instálalo desde una PowerShell **como administrador**:
+
+```powershell
+wsl --install
+```
+
+Esto requiere **reiniciar el equipo** para que los cambios apliquen (el propio comando lo indica al final). Después de reiniciar, confirma con `wsl --status` que la versión predeterminada sea `2`, y recién ahí instala/abre Docker Desktop. La primera vez que abras Docker Desktop debes esperar a que el ícono de la bandeja del sistema deje de animarse (motor arrancado) antes de correr cualquier comando `docker`.
+
+---
+
 ## Suite móvil
 
 ### Stack
