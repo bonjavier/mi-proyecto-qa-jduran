@@ -4,6 +4,7 @@ import { BASE_URL, CREDENTIALS, SLA_MS } from './config/env.js';
 import { loginSchema } from './schemas/loginSchema.js';
 import { userSchema } from './schemas/userSchema.js';
 import { addUserSchema } from './schemas/addUserSchema.js';
+import { deleteUserSchema } from './schemas/deleteUserSchema.js';
 import { checkStatus, checkSLA, checkSchema, checkHeader } from './helpers/checks.js';
 import { buildSummary } from './helpers/report.js';
 
@@ -87,6 +88,7 @@ export default function () {
     });
 
     checkStatus(addRes, 201, '04 - POST users/add');
+    checkHeader(addRes, 'Content-Type', 'application/json', '04 - POST users/add');
     checkSchema(addRes, addUserSchema, '04 - POST users/add');
     checkSLA(addRes, '04 - POST users/add');
     const addBody = addRes.json();
@@ -104,6 +106,7 @@ export default function () {
     );
 
     checkStatus(putRes, 200, '04 - PUT users/2');
+    checkHeader(putRes, 'Content-Type', 'application/json', '04 - PUT users/2');
     checkSchema(putRes, userSchema, '04 - PUT users/2');
     checkSLA(putRes, '04 - PUT users/2');
     const putBody = putRes.json();
@@ -114,6 +117,8 @@ export default function () {
     const deleteRes = http.del(`${BASE_URL}/users/1`);
 
     checkStatus(deleteRes, 200, '04 - DELETE users/1');
+    checkHeader(deleteRes, 'Content-Type', 'application/json', '04 - DELETE users/1');
+    checkSchema(deleteRes, deleteUserSchema, '04 - DELETE users/1');
     checkSLA(deleteRes, '04 - DELETE users/1');
     const deleteBody = deleteRes.json();
     check(deleteRes, {
