@@ -285,18 +285,26 @@ docker --version
 python --version
 ```
 
-### 1. Levantar Kafka
+### 1. Levantar Kafka (+ interfaz web Kafka-UI)
 
 ```bash
 cd event-tests
 docker compose up -d
 ```
 
-Verificar que quedó arriba:
+Esto levanta **dos** contenedores: el broker (`kafka-local`) y [Kafka-UI](https://github.com/provectus/kafka-ui) (`kafka-ui`), una interfaz web de solo observación para ver tópicos y mensajes en vivo sin escribir código.
+
+Verificar que quedaron arriba:
 ```bash
-docker ps                          # kafka-local debe aparecer como "Up"
+docker ps                          # kafka-local Y kafka-ui deben aparecer como "Up"
 docker logs kafka-local --tail 10  # debe terminar en "Kafka Server started"
 ```
+
+Abrir la interfaz:
+```bash
+start http://localhost:8080   # PowerShell/Git Bash en Windows
+```
+En el clúster **"local"** → **Topics** → `gps-raw-events` → pestaña **Messages** verás cada mensaje con su offset, timestamp y JSON completo, en tiempo real mientras corres el productor o el test.
 
 ### 2. Instalar dependencias de Python
 
@@ -325,11 +333,13 @@ docker compose down
 
 ```
 event-tests/
-├── docker-compose.yml        # Kafka local, modo KRaft (sin Zookeeper)
+├── docker-compose.yml        # Kafka local (KRaft, sin Zookeeper) + Kafka-UI
 ├── requirements.txt          # kafka-python-ng, pytest, jsonschema
 ├── schemas/
 │   └── telemetry_schema.py   # contrato de datos del evento GPS
-└── test_gps_events.py        # test integrado: producer + consumer + validaciones
+├── test_gps_events.py        # test integrado: producer + consumer + validaciones
+├── producer_demo.py           # script suelto: publicar mensajes a mano o en lote aleatorio
+└── consumer_demo.py           # script suelto: ver el consumo y su validación en vivo
 ```
 
 ### Conceptos clave explicados
@@ -355,3 +365,7 @@ event-tests/
 **Por qué el contrato de `vehicleId` es un patrón estricto (`^[A-Z]{3}-[0-9]{3}$`) y no solo "string":** validar solo el tipo (`"type": "string"`) deja pasar cualquier texto — un identificador de vehículo real de una flota sigue un formato predecible. Se definió exactamente 3 letras mayúsculas + guion + 3 dígitos (ej. `VEH-099`). Esto obligó a **ajustar el ejemplo literal del PDF** (`VEH-99`, 2 dígitos) a `VEH-099` en el test oficial — una desviación deliberada y documentada, no un descuido; el resto del payload (lat/lng/speed) no cambió.
 
 **Por qué lat/lng no restringen el signo:** son coordenadas geográficas estándar — latitud positiva es hemisferio norte, negativa es hemisferio sur; longitud positiva es este de Greenwich, negativa es oeste. Ambos signos son físicamente válidos según la ubicación (Colombia, por ejemplo, cae en longitud siempre negativa y latitud casi siempre positiva). El contrato ya restringía correctamente el *rango* (-90/90 y -180/180) sin necesidad de restringir el signo, que sería incorrecto hacerlo.
+
+**Por qué el broker tiene dos listeners (`PLAINTEXT` e `INTERNAL`) en vez de uno solo:** al agregar Kafka-UI (que corre dentro de la red de Docker, a diferencia de los scripts Python que corren en Windows), el listener existente (`PLAINTEXT://localhost:9092`) no servía para ambos casos — el broker le anuncia a cada cliente una dirección de reconexión, y "localhost" significa cosas distintas según si preguntas desde dentro o fuera de Docker. Un contenedor que se conecta y recibe como respuesta "reconéctate a localhost:9092" terminaría intentando conectarse a sí mismo. La solución fue agregar un segundo listener (`INTERNAL://kafka:29092`) dedicado a clientes intra-Docker, sin tocar el listener original — los scripts Python en Windows siguen usando exactamente `localhost:9092`, cero cambios para ellos.
+
+**Por qué los datos del tópico se perdieron al agregar Kafka-UI:** el `docker-compose.yml` no define un volumen persistente para Kafka (es un entorno de desarrollo/demo, nunca se prometió persistencia). Cambiar la configuración del broker (agregar el listener nuevo) obligó a recrear el contenedor, y sin volumen, los datos viven solo en la capa de escritura del contenedor — se perdieron los mensajes acumulados de pruebas anteriores. No afecta la validez del test ni de la demo, solo reinicia el offset desde 0.

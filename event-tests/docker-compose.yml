@@ -22,21 +22,31 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
 
       # Listeners = direcciones en las que el proceso escucha.
-      # PLAINTEXT (9092): para clientes normales (producer/consumer), sin cifrar
-      #   (aceptable en local; en producción se usaría TLS).
-      # CONTROLLER (9093): canal interno para la coordinación KRaft, no lo usan
-      #   producer/consumer directamente.
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      # PLAINTEXT (9092): para clientes que corren FUERA de Docker (tus
+      #   scripts Python en Windows), sin cifrar (aceptable en local; en
+      #   producción se usaría TLS).
+      # INTERNAL (29092): para clientes que corren DENTRO de la red de
+      #   Docker (otros contenedores, como Kafka-UI). Ver más abajo por
+      #   qué hace falta un listener separado para esto.
+      # CONTROLLER (9093): canal interno para la coordinación KRaft, no lo
+      #   usan producer/consumer directamente.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
-      # La dirección que el broker "anuncia" a los clientes para que sepan a
-      # dónde conectarse realmente. Como el contenedor se accede desde tu
-      # máquina vía localhost:9092 (por el mapeo de puertos de arriba), debe
-      # decir exactamente eso — si dijera el nombre interno del contenedor,
-      # tu script de Python (fuera de Docker) no podría resolverlo.
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # La dirección que el broker "anuncia" a cada tipo de cliente para
+      # que sepa a dónde conectarse REALMENTE (más allá de la dirección
+      # inicial de arranque). Cada listener anuncia una dirección distinta
+      # porque "quién soy yo" depende de desde dónde te conectas:
+      #   - A un cliente en Windows (fuera de Docker), el broker le dice
+      #     "soy localhost:9092" — correcto, porque así mapeaste el puerto.
+      #   - A un cliente DENTRO de Docker (Kafka-UI), si le dijera
+      #     "localhost", ese contenedor entendería "yo mismo" y no
+      #     encontraría el broker. Por eso el listener INTERNAL anuncia
+      #     el nombre del SERVICIO ("kafka"), que sí es resoluble entre
+      #     contenedores de la misma red de Docker Compose.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
 
       # Con un solo broker, el factor de replicación de los tópicos internos
       # de Kafka (offsets, etc.) tiene que ser 1 — no hay a dónde replicar.
@@ -50,3 +60,32 @@ services:
       # almacenamiento la primera vez que arranca; cualquier string base64
       # válido de 22 caracteres sirve para desarrollo local.
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+
+  # Interfaz web para VER en vivo lo que pasa en Kafka: tópicos, mensajes
+  # entrando, su contenido JSON, y el offset moviéndose. No participa en
+  # el flujo producer/consumer del test — es solo un "visor" de solo
+  # lectura (aunque también permite publicar mensajes de prueba desde la
+  # UI si quisieras).
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      # localhost:8080 en tu navegador -> puerto 8080 dentro del contenedor.
+      - "8080:8080"
+    environment:
+      # Nombre que verás en la UI para identificar este clúster (es solo
+      # una etiqueta, puede ser cualquier texto).
+      KAFKA_CLUSTERS_0_NAME: local
+
+      # A DÓNDE conectarse: el listener INTERNAL del broker (nombre del
+      # servicio + su puerto interno), no "localhost" — Kafka-UI corre
+      # dentro de la red de Docker, igual que el broker. Ver la
+      # explicación completa arriba, junto a KAFKA_ADVERTISED_LISTENERS.
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      # Que Docker arranque primero el broker y después Kafka-UI. Esto
+      # NO garantiza que el broker ya esté "listo para recibir conexiones"
+      # (eso tarda unos segundos más incluso después de que el contenedor
+      # arranca) — solo que el contenedor se inicia en ese orden. Por eso
+      # Kafka-UI trae su propia lógica de reintento de conexión.
+      - kafka
