@@ -39,6 +39,8 @@ from kafka import KafkaProducer
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC_NAME = "gps-raw-events"
 
+SEPARATOR = "─" * 60
+
 DEFAULT_EVENT = {
     "vehicleId": "VEH-099",
     "lat": 4.60,
@@ -156,16 +158,27 @@ CASE_GENERATORS = {
 }
 
 
-def send_one(producer, event, label=None):
-    prefix = f"[{label}] " if label else ""
-    print(f"[PRODUCER-DEMO] {prefix}Enviando: {event}")
+def format_fields(event):
+    """Alinea 'clave : valor' para que el JSON se lea como una tabla,
+    no como un dict de una sola línea. Mismo estilo que consumer_demo.py,
+    para que ambas terminales se vean consistentes."""
+    if not event:
+        return "      (mensaje vacío)"
+    width = max(len(str(k)) for k in event.keys())
+    return "\n".join(f"      {str(k).ljust(width)} : {v}" for k, v in event.items())
+
+
+def send_one(producer, event, header=None):
+    print(SEPARATOR)
+    print(f"  {header}" if header else "  Enviando mensaje")
+    print(SEPARATOR)
+    print(format_fields(event))
+    print()
+
     future = producer.send(TOPIC_NAME, value=event)
     producer.flush()
     record_metadata = future.get(timeout=10)
-    print(
-        f"[PRODUCER-DEMO]   -> confirmado por el broker: partición={record_metadata.partition} "
-        f"offset={record_metadata.offset}"
-    )
+    print(f"      ✓ Confirmado por el broker: partición={record_metadata.partition} offset={record_metadata.offset}\n")
 
 
 def main():
@@ -217,15 +230,21 @@ def main():
             case_name = random.choice(case_names)
             counts[case_name] += 1
             event = CASE_GENERATORS[case_name]()
-            send_one(producer, event, label=f"{i}/{args.count} · {case_name}")
+            send_one(producer, event, header=f"Mensaje {i}/{args.count} · caso: {case_name}")
             if i < args.count:
                 time.sleep(args.delay)
-        print("\n[PRODUCER-DEMO] Resumen de casos generados:")
+
+        print(SEPARATOR)
+        print("  Resumen de casos generados")
+        print(SEPARATOR)
+        name_width = max(len(n) for n in case_names)
         for name, n in counts.items():
-            print(f"  {name}: {n}")
+            barra = "█" * n
+            print(f"      {name.ljust(name_width)} : {str(n).rjust(2)}  {barra}")
+        print(f"\n      Total enviados: {args.count}\n")
     else:
         event = json.loads(args.json_payload) if args.json_payload else DEFAULT_EVENT
-        send_one(producer, event)
+        send_one(producer, event, header="Enviando mensaje")
 
     producer.close()
 
