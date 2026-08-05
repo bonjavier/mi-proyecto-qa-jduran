@@ -339,8 +339,24 @@ event-tests/
 │   └── telemetry_schema.py   # contrato de datos del evento GPS
 ├── test_gps_events.py        # test integrado: producer + consumer + validaciones
 ├── producer_demo.py           # script suelto: publicar mensajes a mano o en lote aleatorio
-└── consumer_demo.py           # script suelto: ver el consumo y su validación en vivo
+├── consumer_demo.py           # script suelto: ver el consumo y su validación en vivo
+└── quality_report.py          # métricas de QA: calidad de datos + consumer lag
 ```
+
+### Métricas de QA (`quality_report.py`)
+
+Un rol de QA no se limita a "pasó/falló" — también aporta métricas para tomar decisiones. Este script genera un lote de mensajes y produce un reporte consolidado con dos métricas pensadas para eso, no para ser un dashboard de infraestructura:
+
+```bash
+python quality_report.py --count 100
+python quality_report.py --count 100 --seed 42   # reproducible
+```
+
+**1. Tasa de calidad de datos + desglose de motivos de rechazo.** Qué porcentaje de mensajes es válido, y de los inválidos, por qué (tipo incorrecto, fuera de rango, campo faltante, formato de `vehicleId`). Sirve para priorizar: si la mayoría de los rechazos son por una sola categoría, ahí está el problema real aguas arriba (firmware del GPS, versión de la app, un sensor específico) — no es "Kafka fallando", es una señal de dónde mirar.
+
+**2. Consumer lag.** Cuántos mensajes hay en el tópico que el consumidor todavía no ha leído (`highwater_offset - position`, calculado con la posición real que lleva Kafka, no un conteo manual). Es la métrica operativa más importante de Kafka. En una plataforma de telemetría de flotas, lag alto significa perder visibilidad en tiempo real de dónde están los vehículos — un riesgo de negocio concreto, no solo técnico.
+
+Se descartaron gráficas de línea (Grafana + Prometheus) por ser mucho más pesadas de lo que pide el reto ("Kafka local ligero") — estas dos métricas se calculan con la misma librería que ya usa el resto de la suite, sin infraestructura adicional.
 
 ### Conceptos clave explicados
 
