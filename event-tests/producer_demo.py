@@ -1,38 +1,37 @@
 """
-Script de DEMO (no es el test oficial) para publicar mensajes a mano.
+Script de DEMO (no es el test oficial) para publicar mensajes a mano o
+en lote, generados al azar, mezclando casos válidos, inválidos y borde.
 
-Uso — mensaje de ejemplo por defecto:
+Uso — un mensaje de ejemplo (el del reto):
     python producer_demo.py
 
-Uso — tu propio JSON (para probar distintas estructuras/valores):
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-01\", \"lat\": 10.5, \"lng\": -73.2, \"speed\": 40}"
+Uso — tu propio JSON:
+    python producer_demo.py --json '{"vehicleId": "VEH-01", "lat": 10.5, "lng": -73.2, "speed": 40}'
 
-Ejemplos para probar (cópialos y pégalos tal cual, con las comillas):
+Uso — N mensajes generados al azar (mezcla de casos):
+    python producer_demo.py --count 20
+    python producer_demo.py --count 20 --seed 42   # reproducible: mismos "aleatorios" cada vez
 
-  Válido, otro vehículo:
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-01\", \"lat\": -33.45, \"lng\": -70.66, \"speed\": 0}"
-
-  INVÁLIDO -> lat fuera de rango (debe ser -90..90):
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-02\", \"lat\": 200, \"lng\": -70.66, \"speed\": 40}"
-
-  INVÁLIDO -> speed negativo:
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-03\", \"lat\": 10, \"lng\": 10, \"speed\": -5}"
-
-  INVÁLIDO -> falta un campo requerido (lng):
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-04\", \"lat\": 10, \"speed\": 40}"
-
-  INVÁLIDO -> tipo incorrecto (speed como texto, no número):
-    python producer_demo.py --json "{\"vehicleId\": \"VEH-05\", \"lat\": 10, \"lng\": 10, \"speed\": \"rapido\"}"
+Con --count, cada mensaje se elige al azar entre estos tipos de caso:
+  - valido                    -> debería ser ACEPTADO por el consumer
+  - lat_fuera_de_rango         -> RECHAZADO (lat fuera de -90..90)
+  - lng_fuera_de_rango         -> RECHAZADO (lng fuera de -180..180)
+  - speed_negativo             -> RECHAZADO (speed < 0)
+  - campo_faltante             -> RECHAZADO (falta vehicleId/lat/lng/speed)
+  - tipo_incorrecto            -> RECHAZADO (un campo numérico llega como texto)
+  - borde_valido                -> ACEPTADO (lat/lng/speed exactamente en el límite: -90, 90, -180, 180, 0)
 
 El PRODUCTOR NO valida nada — Kafka no sabe ni le importa si el JSON es
 "correcto" según nuestras reglas de negocio, solo lo transporta como bytes.
 La validación pasa del lado del CONSUMIDOR (consumer_demo.py). Por eso
-incluso los ejemplos "inválidos" de arriba se van a publicar sin problema
--- lo interesante es ver cómo el consumer, del otro lado, SÍ los rechaza.
+incluso los casos "inválidos" se publican sin problema — lo interesante
+es ver cómo el consumer, del otro lado, SÍ los rechaza (y por qué).
 """
 
 import argparse
 import json
+import random
+import time
 
 from kafka import KafkaProducer
 
@@ -47,20 +46,127 @@ DEFAULT_EVENT = {
 }
 
 
+def _random_vehicle_id():
+    return f"VEH-{random.randint(1, 999):03d}"
+
+
+def case_valido():
+    return {
+        "vehicleId": _random_vehicle_id(),
+        "lat": round(random.uniform(-90, 90), 4),
+        "lng": round(random.uniform(-180, 180), 4),
+        "speed": round(random.uniform(0, 150), 1),
+    }
+
+
+def case_lat_fuera_de_rango():
+    event = case_valido()
+    # Fuera de rango hacia arriba o hacia abajo, al azar.
+    event["lat"] = random.choice([
+        round(random.uniform(90.01, 300), 2),
+        round(random.uniform(-300, -90.01), 2),
+    ])
+    return event
+
+
+def case_lng_fuera_de_rango():
+    event = case_valido()
+    event["lng"] = random.choice([
+        round(random.uniform(180.01, 400), 2),
+        round(random.uniform(-400, -180.01), 2),
+    ])
+    return event
+
+
+def case_speed_negativo():
+    event = case_valido()
+    event["speed"] = round(random.uniform(-100, -0.1), 1)
+    return event
+
+
+def case_campo_faltante():
+    event = case_valido()
+    campo = random.choice(["vehicleId", "lat", "lng", "speed"])
+    del event[campo]
+    return event
+
+
+def case_tipo_incorrecto():
+    event = case_valido()
+    campo = random.choice(["lat", "lng", "speed"])
+    event[campo] = random.choice(["no-es-numero", "rapido", "N/A"])
+    return event
+
+
+def case_borde_valido():
+    # Valores EXACTAMENTE en el límite permitido: jsonschema usa
+    # minimum/maximum inclusivos, así que esto debe ser ACEPTADO.
+    # Sirve para probar que el schema no rechaza por error el borde.
+    return {
+        "vehicleId": _random_vehicle_id(),
+        "lat": random.choice([-90, 90]),
+        "lng": random.choice([-180, 180]),
+        "speed": 0,
+    }
+
+
+CASE_GENERATORS = {
+    "valido": case_valido,
+    "lat_fuera_de_rango": case_lat_fuera_de_rango,
+    "lng_fuera_de_rango": case_lng_fuera_de_rango,
+    "speed_negativo": case_speed_negativo,
+    "campo_faltante": case_campo_faltante,
+    "tipo_incorrecto": case_tipo_incorrecto,
+    "borde_valido": case_borde_valido,
+}
+
+
+def send_one(producer, event, label=None):
+    prefix = f"[{label}] " if label else ""
+    print(f"[PRODUCER-DEMO] {prefix}Enviando: {event}")
+    future = producer.send(TOPIC_NAME, value=event)
+    producer.flush()
+    record_metadata = future.get(timeout=10)
+    print(
+        f"[PRODUCER-DEMO]   -> confirmado por el broker: partición={record_metadata.partition} "
+        f"offset={record_metadata.offset}"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--json",
         dest="json_payload",
         default=None,
-        help="JSON a enviar. Si no se pasa, usa el evento de ejemplo del reto.",
+        help="JSON puntual a enviar. Si no se pasa nada (ni --count), usa el evento de ejemplo del reto.",
+    )
+    group.add_argument(
+        "--count",
+        dest="count",
+        type=int,
+        default=None,
+        help="Cantidad de mensajes aleatorios a generar y enviar (mezcla de casos válidos/inválidos/borde).",
+    )
+    parser.add_argument(
+        "--seed",
+        dest="seed",
+        type=int,
+        default=None,
+        help="Semilla para que la generación aleatoria sea reproducible (opcional, solo con --count).",
+    )
+    parser.add_argument(
+        "--delay",
+        dest="delay",
+        type=float,
+        default=0.3,
+        help="Segundos de pausa entre mensajes cuando se usa --count (default 0.3s).",
     )
     args = parser.parse_args()
 
-    if args.json_payload:
-        event = json.loads(args.json_payload)
-    else:
-        event = DEFAULT_EVENT
+    if args.seed is not None:
+        random.seed(args.seed)
 
     print(f"[PRODUCER-DEMO] Conectando a {KAFKA_BOOTSTRAP_SERVERS}...")
     producer = KafkaProducer(
@@ -68,14 +174,24 @@ def main():
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     )
 
-    print(f"[PRODUCER-DEMO] Enviando a '{TOPIC_NAME}': {event}")
-    future = producer.send(TOPIC_NAME, value=event)
-    producer.flush()
-    record_metadata = future.get(timeout=10)
-    print(
-        f"[PRODUCER-DEMO] Confirmado por el broker: partición={record_metadata.partition} "
-        f"offset={record_metadata.offset}"
-    )
+    if args.count:
+        print(f"[PRODUCER-DEMO] Generando y enviando {args.count} mensajes aleatorios...\n")
+        case_names = list(CASE_GENERATORS.keys())
+        counts = {name: 0 for name in case_names}
+        for i in range(1, args.count + 1):
+            case_name = random.choice(case_names)
+            counts[case_name] += 1
+            event = CASE_GENERATORS[case_name]()
+            send_one(producer, event, label=f"{i}/{args.count} · {case_name}")
+            if i < args.count:
+                time.sleep(args.delay)
+        print("\n[PRODUCER-DEMO] Resumen de casos generados:")
+        for name, n in counts.items():
+            print(f"  {name}: {n}")
+    else:
+        event = json.loads(args.json_payload) if args.json_payload else DEFAULT_EVENT
+        send_one(producer, event)
+
     producer.close()
 
 
