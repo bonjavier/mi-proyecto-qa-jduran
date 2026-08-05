@@ -5,8 +5,8 @@ en lote, generados al azar, mezclando casos válidos, inválidos y borde.
 Uso — un mensaje de ejemplo (el del reto):
     python producer_demo.py
 
-Uso — tu propio JSON:
-    python producer_demo.py --json '{"vehicleId": "VEH-01", "lat": 10.5, "lng": -73.2, "speed": 40}'
+Uso — tu propio JSON (vehicleId debe ser 3 letras + guion + 3 dígitos):
+    python producer_demo.py --json '{"vehicleId": "VEH-001", "lat": 10.5, "lng": -73.2, "speed": 40}'
 
 Uso — N mensajes generados al azar (mezcla de casos):
     python producer_demo.py --count 20
@@ -19,6 +19,7 @@ Con --count, cada mensaje se elige al azar entre estos tipos de caso:
   - speed_negativo             -> RECHAZADO (speed < 0)
   - campo_faltante             -> RECHAZADO (falta vehicleId/lat/lng/speed)
   - tipo_incorrecto            -> RECHAZADO (un campo numérico llega como texto)
+  - vehicleId_formato_invalido  -> RECHAZADO (no cumple "AAA-999": minúsculas, largo distinto, sin guion...)
   - borde_valido                -> ACEPTADO (lat/lng/speed exactamente en el límite: -90, 90, -180, 180, 0)
 
 El PRODUCTOR NO valida nada — Kafka no sabe ni le importa si el JSON es
@@ -39,7 +40,7 @@ KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC_NAME = "gps-raw-events"
 
 DEFAULT_EVENT = {
-    "vehicleId": "VEH-99",
+    "vehicleId": "VEH-099",
     "lat": 4.60,
     "lng": -74.08,
     "speed": 65,
@@ -47,7 +48,12 @@ DEFAULT_EVENT = {
 
 
 def _random_vehicle_id():
-    return f"VEH-{random.randint(1, 999):03d}"
+    # Formato del contrato: exactamente 3 letras mayúsculas + guion +
+    # 3 dígitos (ver schemas/telemetry_schema.py). Letras al azar (no
+    # siempre "VEH") para tener variedad real de flotas/tipos de vehículo.
+    letras = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ", k=3))
+    numeros = random.randint(0, 999)
+    return f"{letras}-{numeros:03d}"
 
 
 def case_valido():
@@ -98,6 +104,34 @@ def case_tipo_incorrecto():
     return event
 
 
+def case_vehicleId_formato_invalido():
+    event = case_valido()
+    variante = random.choice([
+        "minusculas", "sin_guion", "pocos_digitos", "muchos_digitos",
+        "pocas_letras", "muchas_letras", "letras_donde_van_numeros",
+    ])
+    if variante == "minusculas":
+        event["vehicleId"] = event["vehicleId"].lower()
+    elif variante == "sin_guion":
+        event["vehicleId"] = event["vehicleId"].replace("-", "")
+    elif variante == "pocos_digitos":
+        letras = event["vehicleId"].split("-")[0]
+        event["vehicleId"] = f"{letras}-{random.randint(0, 99):02d}"
+    elif variante == "muchos_digitos":
+        letras = event["vehicleId"].split("-")[0]
+        event["vehicleId"] = f"{letras}-{random.randint(0, 9999):04d}"
+    elif variante == "pocas_letras":
+        numeros = event["vehicleId"].split("-")[1]
+        event["vehicleId"] = f"AB-{numeros}"
+    elif variante == "muchas_letras":
+        numeros = event["vehicleId"].split("-")[1]
+        event["vehicleId"] = f"ABCD-{numeros}"
+    elif variante == "letras_donde_van_numeros":
+        letras = event["vehicleId"].split("-")[0]
+        event["vehicleId"] = f"{letras}-XYZ"
+    return event
+
+
 def case_borde_valido():
     # Valores EXACTAMENTE en el límite permitido: jsonschema usa
     # minimum/maximum inclusivos, así que esto debe ser ACEPTADO.
@@ -117,6 +151,7 @@ CASE_GENERATORS = {
     "speed_negativo": case_speed_negativo,
     "campo_faltante": case_campo_faltante,
     "tipo_incorrecto": case_tipo_incorrecto,
+    "vehicleId_formato_invalido": case_vehicleId_formato_invalido,
     "borde_valido": case_borde_valido,
 }
 

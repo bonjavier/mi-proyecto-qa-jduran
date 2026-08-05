@@ -21,9 +21,15 @@ KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC_NAME = "gps-raw-events"
 CONSUME_TIMEOUT_SECONDS = 10
 
-# El evento de ejemplo que pide el enunciado del reto, tal cual.
+# El evento de ejemplo del enunciado del reto, con UN ajuste deliberado:
+# el PDF usa "VEH-99" (2 dígitos), pero definimos el contrato de
+# vehicleId como estrictamente 3 letras + guion + 3 dígitos (ver
+# schemas/telemetry_schema.py) para tener una validación de formato más
+# rigurosa que "cualquier string". "VEH-99" no cumpliría ese patrón, así
+# que usamos "VEH-099" — mismo vehículo, mismo resto de datos, formato
+# correcto. Esta decisión está documentada también en AI_USAGE.md.
 SAMPLE_EVENT = {
-    "vehicleId": "VEH-99",
+    "vehicleId": "VEH-099",
     "lat": 4.60,
     "lng": -74.08,
     "speed": 65,
@@ -112,6 +118,15 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
     # habría una carrera real entre producer y consumer y el test sería
     # flaky. "earliest" + group nuevo es la combinación que lo hace
     # determinista.)
+    #
+    # OJO — matiz importante: "earliest" arranca desde el offset 0, no
+    # desde el mensaje que acabamos de mandar. Si el tópico ya tiene
+    # mensajes viejos de corridas anteriores (los tiene: este tópico no
+    # se limpia entre corridas), el PRIMER mensaje que llega es el más
+    # viejo del tópico, no necesariamente el nuestro. Por eso no basta
+    # con "tomar el primero que llegue": hay que seguir leyendo hasta
+    # encontrar exactamente el offset que el broker nos confirmó al
+    # producir (record_metadata.offset, más arriba).
     unique_group_id = f"test-consumer-{uuid.uuid4()}"
     print(f"\n[CONSUMER] group_id nuevo para esta corrida: {unique_group_id}")
 
@@ -148,12 +163,16 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
             )
             print(f"[CONSUMER] Conectado. Esperando mensajes (timeout {CONSUME_TIMEOUT_SECONDS}s)...")
             for message in consumer:
+                if message.partition != record_metadata.partition or message.offset != record_metadata.offset:
+                    # Mensaje viejo de una corrida anterior, no el nuestro.
+                    # Lo ignoramos y seguimos leyendo.
+                    continue
                 received_event = message.value
                 print(
                     f"[CONSUMER] Mensaje recibido -> partición={message.partition} "
                     f"offset={message.offset}: {received_event}"
                 )
-                break  # con el primero que llegue alcanza para este test
+                break  # este SÍ es el mensaje que acabamos de publicar
             consumer.close()
             print("[CONSUMER] Conexión cerrada.")
             break  # conexión y consumo OK, no hace falta reintentar

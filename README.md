@@ -311,7 +311,7 @@ python -m pytest test_gps_events.py -v
 ```
 
 Debería terminar en `1 passed`. El test:
-1. Publica `{"vehicleId":"VEH-99","lat":4.60,"lng":-74.08,"speed":65}` en el tópico `gps-raw-events`.
+1. Publica `{"vehicleId":"VEH-099","lat":4.60,"lng":-74.08,"speed":65}` en el tópico `gps-raw-events` (el PDF del reto usa "VEH-99"; se ajustó a 3 dígitos para cumplir el patrón estricto de `vehicleId` — ver "Decisiones de diseño" abajo).
 2. Lo consume de vuelta.
 3. Valida que sea idéntico a lo enviado, que cumpla el contrato de datos, que los rangos (lat/lng/speed) sean físicamente válidos, y que haya llegado dentro del timeout (10s).
 
@@ -351,3 +351,7 @@ event-tests/
 **Por qué `kafka-python-ng` y no `kafka-python`:** el paquete original (`kafka-python` en PyPI) tiene un bug de compatibilidad conocido con Python 3.12+ (falla al importar `kafka.vendor.six.moves`). `kafka-python-ng` es el fork mantenido activamente que lo corrige, exponiendo el mismo namespace `kafka` — el código de importación no cambia en nada.
 
 **Por qué el consumer reintenta la conexión (hasta 5 veces, con 1s de pausa entre intentos):** se detectó empíricamente (corriendo el test repetidamente, en algunos casos más de 15 veces seguidas) que el selector de sockets de `kafka-python-ng` en Windows falla de forma intermitente con `ValueError: Invalid file descriptor: -1` durante el primer intento de conexión al coordinador del grupo — una condición de carrera de bajo nivel de la librería, no un problema de nuestro tópico/offset (los logs del broker confirman que el grupo sí se forma correctamente del lado del servidor). La frecuencia de la falla aumentó al correr el test muchas veces seguidas en poco tiempo, consistente con acumulación de conexiones TCP en estado `TIME_WAIT` en Windows — un efecto de correr el mismo proceso Python repetidamente en segundos, no algo esperable en un uso normal (una corrida aislada, o en CI). El reintento con una breve pausa lo resuelve siempre.
+
+**Por qué el contrato de `vehicleId` es un patrón estricto (`^[A-Z]{3}-[0-9]{3}$`) y no solo "string":** validar solo el tipo (`"type": "string"`) deja pasar cualquier texto — un identificador de vehículo real de una flota sigue un formato predecible. Se definió exactamente 3 letras mayúsculas + guion + 3 dígitos (ej. `VEH-099`). Esto obligó a **ajustar el ejemplo literal del PDF** (`VEH-99`, 2 dígitos) a `VEH-099` en el test oficial — una desviación deliberada y documentada, no un descuido; el resto del payload (lat/lng/speed) no cambió.
+
+**Por qué lat/lng no restringen el signo:** son coordenadas geográficas estándar — latitud positiva es hemisferio norte, negativa es hemisferio sur; longitud positiva es este de Greenwich, negativa es oeste. Ambos signos son físicamente válidos según la ubicación (Colombia, por ejemplo, cae en longitud siempre negativa y latitud casi siempre positiva). El contrato ya restringía correctamente el *rango* (-90/90 y -180/180) sin necesidad de restringir el signo, que sería incorrecto hacerlo.

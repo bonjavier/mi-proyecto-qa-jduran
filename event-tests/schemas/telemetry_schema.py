@@ -16,17 +16,29 @@ TELEMETRY_SCHEMA = {
     "properties": {
         "vehicleId": {
             "type": "string",
+            # Formato estricto del identificador de vehículo: exactamente
+            # 3 letras mayúsculas, un guion, y exactamente 3 dígitos.
+            # Ej. válido: "VEH-099". Ej. inválido: "VEH-99" (solo 2
+            # dígitos), "veh-099" (minúsculas), "VEHICULO-099" (más de
+            # 3 letras). jsonschema usa regex estilo ECMA-262 en "pattern".
+            "pattern": "^[A-Z]{3}-[0-9]{3}$",
         },
         "lat": {
             # "number" acepta tanto enteros como decimales (float).
             "type": "number",
-            # Rango físicamente válido de latitud terrestre.
+            # Rango físicamente válido de latitud terrestre. El signo
+            # importa pero AMBOS son legítimos (positivo = hemisferio
+            # norte, negativo = hemisferio sur) — no se restringe el
+            # signo, solo el rango.
             "minimum": -90,
             "maximum": 90,
         },
         "lng": {
             "type": "number",
-            # Rango físicamente válido de longitud terrestre.
+            # Rango físicamente válido de longitud terrestre. Igual que
+            # lat: ambos signos son válidos (positivo = este de
+            # Greenwich, negativo = oeste); Colombia, por ejemplo, cae
+            # siempre en longitud negativa.
             "minimum": -180,
             "maximum": 180,
         },
