@@ -61,6 +61,20 @@ services:
       # válido de 22 caracteres sirve para desarrollo local.
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
 
+      # JMX es el mecanismo estándar de Java para exponer métricas de
+      # rendimiento (throughput, bytes in/out, etc.). Sin esto, Kafka-UI
+      # puede ver tópicos y mensajes (eso es protocolo normal de Kafka),
+      # pero su pantalla de "Dashboard" con gráficos de actividad queda
+      # vacía, porque esos gráficos se alimentan específicamente de JMX.
+      # JMX_PORT (sin prefijo KAFKA_) es una variable que lee directamente
+      # el script de arranque del contenedor, no una que se traduzca a
+      # server.properties como las KAFKA_* de arriba.
+      JMX_PORT: 9101
+      # JMX usa RMI por debajo, que necesita saber qué hostname anunciarse
+      # a sí mismo para que un cliente en OTRO contenedor (Kafka-UI) pueda
+      # completar la conexión — mismo principio que KAFKA_ADVERTISED_LISTENERS.
+      KAFKA_OPTS: -Djava.rmi.server.hostname=kafka
+
   # Interfaz web para VER en vivo lo que pasa en Kafka: tópicos, mensajes
   # entrando, su contenido JSON, y el offset moviéndose. No participa en
   # el flujo producer/consumer del test — es solo un "visor" de solo
@@ -82,6 +96,10 @@ services:
       # dentro de la red de Docker, igual que el broker. Ver la
       # explicación completa arriba, junto a KAFKA_ADVERTISED_LISTENERS.
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      # Dónde encontrar las métricas JMX del broker (ver JMX_PORT arriba).
+      # Con esto, el Dashboard de Kafka-UI muestra gráficos reales de
+      # actividad (bytes in/out por segundo, etc.) en vez de quedar vacío.
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9101
     depends_on:
       # Que Docker arranque primero el broker y después Kafka-UI. Esto
       # NO garantiza que el broker ya esté "listo para recibir conexiones"
