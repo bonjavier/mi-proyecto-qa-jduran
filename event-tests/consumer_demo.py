@@ -24,6 +24,8 @@ from schemas.telemetry_schema import TELEMETRY_SCHEMA
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 TOPIC_NAME = "gps-raw-events"
 
+SEPARATOR = "─" * 60
+
 
 def connect_with_retry(max_attempts=5):
     """
@@ -52,30 +54,52 @@ def connect_with_retry(max_attempts=5):
     return None
 
 
-def validate_and_print(event, offset):
-    print(f"--- Mensaje recibido (offset={offset}) ---")
-    print(f"  Contenido: {event}")
+def format_fields(event):
+    """Alinea 'clave : valor' para que el JSON se lea como una tabla,
+    no como un dict de una sola línea."""
+    if not event:
+        return "      (mensaje vacío)"
+    width = max(len(str(k)) for k in event.keys())
+    return "\n".join(f"      {str(k).ljust(width)} : {v}" for k, v in event.items())
+
+
+def validate_and_print(event, offset, stats):
+    print(SEPARATOR)
+    print(f"  Mensaje #{stats['total'] + 1}  (offset={offset})")
+    print(SEPARATOR)
+    print(format_fields(event))
+    print()
+
+    stats["total"] += 1
 
     try:
         validate(instance=event, schema=TELEMETRY_SCHEMA)
-        print("  Validación de contrato (jsonschema): OK")
     except ValidationError as e:
-        print(f"  Validación de contrato (jsonschema): RECHAZADO -> {e.message}")
+        print(f"      ✗ Contrato (jsonschema)  RECHAZADO -> {e.message}")
         print()
+        stats["rechazados"] += 1
+        print(f"  Total: {stats['aceptados']} aceptados · {stats['rechazados']} rechazados\n")
         return
+
+    print("      ✓ Contrato (jsonschema)  OK")
 
     lat_ok = -90 <= event.get("lat", 0) <= 90
     lng_ok = -180 <= event.get("lng", 0) <= 180
     speed_ok = event.get("speed", -1) >= 0
+
     if lat_ok and lng_ok and speed_ok:
-        print("  Validación de rangos: OK")
+        print("      ✓ Rangos (lat/lng/speed) OK")
+        stats["aceptados"] += 1
     else:
-        print(f"  Validación de rangos: RECHAZADO (lat_ok={lat_ok}, lng_ok={lng_ok}, speed_ok={speed_ok})")
-    print()
+        print(f"      ✗ Rangos (lat/lng/speed) RECHAZADO (lat_ok={lat_ok}, lng_ok={lng_ok}, speed_ok={speed_ok})")
+        stats["rechazados"] += 1
+
+    print(f"\n  Total: {stats['aceptados']} aceptados · {stats['rechazados']} rechazados\n")
 
 
 def main():
     print(f"[CONSUMER-DEMO] Conectando a {KAFKA_BOOTSTRAP_SERVERS}, tópico '{TOPIC_NAME}'...")
+    stats = {"total": 0, "aceptados": 0, "rechazados": 0}
 
     while True:
         consumer = connect_with_retry()
@@ -86,7 +110,7 @@ def main():
 
         try:
             for message in consumer:
-                validate_and_print(message.value, message.offset)
+                validate_and_print(message.value, message.offset, stats)
             # El generador termina solo si hay un consumer_timeout_ms
             # configurado (aquí no lo hay), así que en la práctica esto
             # no debería alcanzarse — se queda escuchando para siempre.
