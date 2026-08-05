@@ -39,13 +39,15 @@ def ensure_topic_exists():
     correr nada, y si ya existe de una corrida anterior, lo ignoramos:
     un tópico es barato de mantener y no necesitamos borrarlo entre corridas.
     """
+    print(f"\n[SETUP] Conectando al broker en {KAFKA_BOOTSTRAP_SERVERS} para asegurar que el tópico '{TOPIC_NAME}' existe...")
     admin = KafkaAdminClient(bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS)
     try:
         admin.create_topics(
             [NewTopic(name=TOPIC_NAME, num_partitions=1, replication_factor=1)]
         )
+        print(f"[SETUP] Tópico '{TOPIC_NAME}' creado (no existía).")
     except TopicAlreadyExistsError:
-        pass
+        print(f"[SETUP] Tópico '{TOPIC_NAME}' ya existía, se reutiliza.")
     finally:
         admin.close()
     yield
@@ -61,17 +63,31 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
     # enviarlo: convierte el dict de Python a texto JSON (json.dumps) y
     # ese texto a bytes (.encode). El consumer, del otro lado, tendrá que
     # hacer el camino inverso (bytes -> texto -> dict) para poder leerlo.
+    print(f"\n[PRODUCER] Conectando al broker en {KAFKA_BOOTSTRAP_SERVERS}...")
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     )
+    print(f"[PRODUCER] Conectado. Enviando al tópico '{TOPIC_NAME}': {SAMPLE_EVENT}")
 
-    producer.send(TOPIC_NAME, value=SAMPLE_EVENT)
+    future = producer.send(TOPIC_NAME, value=SAMPLE_EVENT)
     # send() es asíncrono (encola el mensaje y sigue); flush() bloquea
     # hasta que el broker confirmó que lo recibió. Sin flush(), el test
     # podría intentar consumir antes de que el mensaje siquiera saliera.
     producer.flush()
+
+    # send() devuelve un "future": al pedirle el resultado (.get()) nos
+    # dice EXACTAMENTE dónde quedó guardado el mensaje en el broker —
+    # en qué partición y en qué offset (posición). Esto es la prueba
+    # directa de que el broker lo recibió y lo persistió, no solo de
+    # que Python "no tiró error".
+    record_metadata = future.get(timeout=10)
+    print(
+        f"[PRODUCER] Confirmado por el broker: tópico='{record_metadata.topic}' "
+        f"partición={record_metadata.partition} offset={record_metadata.offset}"
+    )
     producer.close()
+    print("[PRODUCER] Conexión cerrada.")
 
     # ────────────────────────────────────────────────────────────────
     # CONSUMER: lee el evento de vuelta
@@ -97,6 +113,7 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
     # flaky. "earliest" + group nuevo es la combinación que lo hace
     # determinista.)
     unique_group_id = f"test-consumer-{uuid.uuid4()}"
+    print(f"\n[CONSUMER] group_id nuevo para esta corrida: {unique_group_id}")
 
     # NOTA (problema real encontrado y corregido): en Windows, el selector
     # de sockets interno de kafka-python-ng a veces lanza
@@ -118,6 +135,7 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
             # sistema operativo antes de que la librería abra uno nuevo.
             time.sleep(1)
         try:
+            print(f"[CONSUMER] Intento {attempt}: conectando y suscribiéndome a '{TOPIC_NAME}'...")
             consumer = KafkaConsumer(
                 TOPIC_NAME,
                 bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
@@ -128,10 +146,16 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
                 # (en vez de bloquear el test para siempre).
                 consumer_timeout_ms=CONSUME_TIMEOUT_SECONDS * 1000,
             )
+            print(f"[CONSUMER] Conectado. Esperando mensajes (timeout {CONSUME_TIMEOUT_SECONDS}s)...")
             for message in consumer:
                 received_event = message.value
+                print(
+                    f"[CONSUMER] Mensaje recibido -> partición={message.partition} "
+                    f"offset={message.offset}: {received_event}"
+                )
                 break  # con el primero que llegue alcanza para este test
             consumer.close()
+            print("[CONSUMER] Conexión cerrada.")
             break  # conexión y consumo OK, no hace falta reintentar
         except ValueError as e:
             last_error = e
@@ -154,21 +178,27 @@ def test_gps_event_is_produced_and_consumed_correctly(ensure_topic_exists):
             f"publicado sin errores."
         )
 
+    print(f"\n[VALIDACIÓN] Enviado:  {SAMPLE_EVENT}")
+    print(f"[VALIDACIÓN] Recibido: {received_event}")
+
     # 1) Integridad: lo que llegó debe ser EXACTAMENTE lo que se envió.
     assert received_event == SAMPLE_EVENT, (
         f"El evento recibido no coincide con el enviado.\n"
         f"Enviado:  {SAMPLE_EVENT}\n"
         f"Recibido: {received_event}"
     )
+    print("[VALIDACIÓN] 1/3 Integridad (recibido == enviado): OK")
 
     # 2) Contrato: la estructura y los tipos deben cumplir el schema.
     try:
         validate(instance=received_event, schema=TELEMETRY_SCHEMA)
     except ValidationError as e:
         pytest.fail(f"El evento no cumple el schema de telemetría: {e.message}")
+    print("[VALIDACIÓN] 2/3 Contrato (jsonschema: tipos vehicleId/lat/lng/speed): OK")
 
     # 3) Rangos válidos (redundante con el schema, pero explícito y
     #    fácil de leer/mostrar en el video sin abrir el archivo de schema).
     assert -90 <= received_event["lat"] <= 90, "Latitud fuera de rango válido"
     assert -180 <= received_event["lng"] <= 180, "Longitud fuera de rango válido"
     assert received_event["speed"] >= 0, "Velocidad no puede ser negativa"
+    print("[VALIDACIÓN] 3/3 Rangos (lat -90..90, lng -180..180, speed >= 0): OK")
