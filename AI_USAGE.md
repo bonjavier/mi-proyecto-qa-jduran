@@ -11,6 +11,7 @@
 - Diagnóstico de fallos reales: crash de la app por incompatibilidad de tamaño de página de memoria (16KB vs 4KB) entre el APK y el emulador; selectores rotos por idioma del dispositivo (`test-Username` vs `test-Usuario`); `UndefinedStepException` causado por falta de encoding UTF-8 explícito en la compilación Java.
 - Implementación del caso de login inválido (obligatorio según el reto) y eliminación de esperas fijas (`Thread.sleep`) por esperas dinámicas ya provistas por Serenity.
 - Limpieza de archivos huérfanos/config duplicada (`android.conf` con rutas de otra máquina).
+- Reorganización de todo el proyecto Gradle (src/, build.gradle, wrapper, APK) de la raíz del repo a `mobile-tests/`, para alinear la estructura de carpetas con la sugerida en el PDF del reto (`mobile-tests/`, `api-tests/`, `event-tests/` como carpetas hermanas). Se usó `git mv` para preservar el historial de cada archivo, y se verificó que el proyecto compila (`./gradlew compileTestJava`) desde la nueva ubicación antes de dar el cambio por bueno.
 
 **Capa de API (k6 + JavaScript):**
 - Generación del andamiaje del proyecto (config centralizada, schemas por endpoint, helpers de aserciones reutilizables).

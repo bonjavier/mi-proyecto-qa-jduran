@@ -4,9 +4,12 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 
 ```
 .
-├── src/                # suite móvil (Java/Screenplay/Serenity/Cucumber)
-├── 2-sauceLabs.apk     # APK del SUT
-├── api-tests/           # suite de API (k6)
+├── mobile-tests/         # suite móvil (Java/Screenplay/Serenity/Cucumber)
+│   ├── src/
+│   ├── build.gradle
+│   ├── gradlew
+│   └── 2-sauceLabs.apk
+├── api-tests/            # suite de API (k6)
 │   ├── run.sh
 │   ├── src/
 │   └── reports/
@@ -72,24 +75,26 @@ Esto requiere **reiniciar el equipo** para que los cambios apliquen (el propio c
   appium driver install uiautomator2
   ```
 - Un emulador Android corriendo, o un dispositivo físico con depuración USB activada
-- El APK de la app (`2-sauceLabs.apk`, incluido en este repo)
+- El APK de la app (`mobile-tests/2-sauceLabs.apk`, incluido en este repo)
 
 ### Configuración
 
-Las capabilities de Appium están en `src/test/resources/serenity.conf`. La ruta del APK y el `noReset` se leen de variables de entorno:
+Las capabilities de Appium están en `mobile-tests/src/test/resources/serenity.conf`. La ruta del APK y el `noReset` se leen de variables de entorno:
 
 ```bash
-export APP_PATH="/ruta/absoluta/a/2-sauceLabs.apk"
+export APP_PATH="/ruta/absoluta/a/mobile-tests/2-sauceLabs.apk"
 export NO_RESET=false
 ```
 
 En Windows (PowerShell):
 ```powershell
-$env:APP_PATH = "C:\ruta\a\2-sauceLabs.apk"
+$env:APP_PATH = "C:\ruta\a\mobile-tests\2-sauceLabs.apk"
 $env:NO_RESET = "false"
 ```
 
 ### Ejecutar la suite
+
+Desde `mobile-tests/`:
 
 1. Levanta el servidor de Appium:
    ```bash
@@ -101,12 +106,13 @@ $env:NO_RESET = "false"
    ```
 3. Corre las pruebas:
    ```bash
+   cd mobile-tests
    ./gradlew clean test
    ```
 
 ### Reportes
 
-Serenity genera el reporte HTML en `target/site/serenity/index.html` al finalizar la ejecución. Para abrirlo (desde la raíz del repo):
+Serenity genera el reporte HTML en `mobile-tests/target/site/serenity/index.html` al finalizar la ejecución. Para abrirlo (desde `mobile-tests/`):
 
 ```powershell
 start target/site/serenity/index.html
