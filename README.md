@@ -79,17 +79,16 @@ Esto requiere **reiniciar el equipo** para que los cambios apliquen (el propio c
 
 ### Configuración
 
-Las capabilities de Appium están en `mobile-tests/src/test/resources/serenity.conf`. La ruta del APK y el `noReset` se leen de variables de entorno:
+Las capabilities de Appium están en `mobile-tests/src/test/resources/serenity.conf`. **No necesitas configurar nada para correr la suite** — `build.gradle` calcula automáticamente la ruta del APK incluido en el proyecto (`mobile-tests/2-sauceLabs.apk`) y se la pasa como variable de entorno al proceso de test.
+
+Solo si necesitas apuntar a otro APK/ruta (poco común), puedes sobreescribir con tu propia variable de entorno `APP_PATH` antes de correr el build:
 
 ```bash
-export APP_PATH="/ruta/absoluta/a/mobile-tests/2-sauceLabs.apk"
-export NO_RESET=false
+export APP_PATH="/ruta/absoluta/a/otro.apk"
 ```
 
-En Windows (PowerShell):
 ```powershell
-$env:APP_PATH = "C:\ruta\a\mobile-tests\2-sauceLabs.apk"
-$env:NO_RESET = "false"
+$env:APP_PATH = "C:\ruta\a\otro.apk"
 ```
 
 ### Ejecutar la suite
