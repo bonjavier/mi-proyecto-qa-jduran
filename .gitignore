@@ -20,8 +20,9 @@ gradle-app.setting
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
-# Serenity reports
+# Serenity reports and cross-run history (trend graphs, flaky-test detection)
 target/
+history/
 
 # IDE
 .idea/
