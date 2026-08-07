@@ -1,0 +1,125 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Mobile: Run tests",
+      "type": "shell",
+      "command": ".\\gradlew.bat test",
+      "options": { "cwd": "${workspaceFolder}/mobile-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Mobile: Open report",
+      "type": "shell",
+      "command": "start target\\site\\serenity\\index.html",
+      "options": { "cwd": "${workspaceFolder}/mobile-tests" },
+      "presentation": { "panel": "shared", "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "API: Functional",
+      "type": "shell",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["run.sh", "functional"],
+      "options": { "cwd": "${workspaceFolder}/api-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "API: Load",
+      "type": "shell",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["run.sh", "load"],
+      "options": { "cwd": "${workspaceFolder}/api-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "API: All (functional -> load)",
+      "type": "shell",
+      "command": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["run.sh", "all"],
+      "options": { "cwd": "${workspaceFolder}/api-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "API: Open functional report",
+      "type": "shell",
+      "command": "start reports\\functional-summary.html",
+      "options": { "cwd": "${workspaceFolder}/api-tests" },
+      "presentation": { "panel": "shared", "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "API: Open load report",
+      "type": "shell",
+      "command": "start reports\\load-summary.html",
+      "options": { "cwd": "${workspaceFolder}/api-tests" },
+      "presentation": { "panel": "shared", "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Up (docker compose)",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Down (docker compose)",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "shared", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Open UI (localhost:8080)",
+      "type": "shell",
+      "command": "start http://localhost:8080",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "shared", "reveal": "silent" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Consumer (live, terminal dedicada)",
+      "type": "shell",
+      "command": "python -u consumer_demo.py",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always", "group": "kafka-demo" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Producer (lote de 10, terminal dedicada)",
+      "type": "shell",
+      "windows": {
+        "command": "powershell -Command \"Start-Sleep -Seconds 5; python producer_demo.py --count 10\""
+      },
+      "command": "sleep 5 && python producer_demo.py --count 10",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always", "group": "kafka-demo" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Producer + Consumer (2 terminales)",
+      "dependsOn": [
+        "Kafka: Consumer (live, terminal dedicada)",
+        "Kafka: Producer (lote de 10, terminal dedicada)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Kafka: Quality report",
+      "type": "shell",
+      "command": "python quality_report.py --count 50",
+      "options": { "cwd": "${workspaceFolder}/event-tests" },
+      "presentation": { "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    }
+  ]
+}

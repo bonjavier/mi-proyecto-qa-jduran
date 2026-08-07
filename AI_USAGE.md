@@ -33,6 +33,10 @@
 - Incorporación de **Kafka-UI** (Provectus) como herramienta de observabilidad: interfaz web para ver en vivo los tópicos, mensajes y offsets del broker existente, sin escribir código. Se agregó como servicio adicional al `docker-compose.yml` que ya existía, sin modificar el comportamiento para los clientes Python (ver ajuste necesario abajo).
 - Diseño de `quality_report.py`: dos métricas de QA (tasa de calidad de datos con desglose de motivos de rechazo, y consumer lag) elegidas explícitamente por su relevancia para toma de decisiones de negocio, no como métricas de infraestructura genéricas.
 
+**Preparación del video y ergonomía de ejecución:**
+- Guion y cronograma del video de sustentación (mantenido fuera del repositorio a propósito — es una nota de preparación personal, no un entregable del reto).
+- `.vscode/tasks.json`: un comando por fase (móvil, API, Kafka), incluyendo una tarea compuesta que abre productor y consumidor de Kafka en dos terminales en paralelo. Documentado en el README como una comodidad opcional de VS Code, dejando claro que no reemplaza los comandos de terminal estándar (que siguen siendo la vía portable/verificable en cualquier entorno).
+
 ## 3. Ejemplos de prompts
 
 ### (a) Prompt maestro para la suite de API en k6

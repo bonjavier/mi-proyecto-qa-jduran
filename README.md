@@ -19,6 +19,8 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
     └── test_gps_events.py
 ```
 
+> **Atajo para VS Code:** todos los comandos de este README también están disponibles como *tasks* de VS Code (`.vscode/tasks.json`) — `Ctrl+Shift+P` → **"Tasks: Run Task"** → elige la tarea. Incluye una tarea compuesta para Kafka que abre productor y consumidor en dos terminales a la vez. Esto es una comodidad solo para VS Code; los comandos de abajo funcionan en cualquier terminal.
+
 ---
 
 ## Prerrequisitos y Stack
