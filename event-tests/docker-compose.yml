@@ -1,0 +1,109 @@
+# Kafka local, ligero, en modo KRaft (sin Zookeeper).
+#
+# Un único contenedor cumple DOS roles a la vez:
+#   - "broker": recibe/guarda/entrega mensajes (lo que usan producer y consumer).
+#   - "controller": coordina metadata del clúster (quién es el líder de cada
+#     partición, etc.) — esto es lo que antes hacía Zookeeper por separado.
+# Combinar ambos roles en un solo proceso es válido y recomendado para
+# desarrollo local; en producción se separarían en varios nodos.
+services:
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka-local
+    ports:
+      # Puerto donde el broker escucha conexiones de clientes (producer/consumer)
+      # desde FUERA del contenedor, ej. tu script de Python en Windows.
+      - "9092:9092"
+    environment:
+      # Identificador único de este nodo dentro del "clúster" (aunque solo hay uno).
+      KAFKA_NODE_ID: 1
+
+      # Este nodo actúa como broker Y como controller (ver comentario arriba).
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # Listeners = direcciones en las que el proceso escucha.
+      # PLAINTEXT (9092): para clientes que corren FUERA de Docker (tus
+      #   scripts Python en Windows), sin cifrar (aceptable en local; en
+      #   producción se usaría TLS).
+      # INTERNAL (29092): para clientes que corren DENTRO de la red de
+      #   Docker (otros contenedores, como Kafka-UI). Ver más abajo por
+      #   qué hace falta un listener separado para esto.
+      # CONTROLLER (9093): canal interno para la coordinación KRaft, no lo
+      #   usan producer/consumer directamente.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # La dirección que el broker "anuncia" a cada tipo de cliente para
+      # que sepa a dónde conectarse REALMENTE (más allá de la dirección
+      # inicial de arranque). Cada listener anuncia una dirección distinta
+      # porque "quién soy yo" depende de desde dónde te conectas:
+      #   - A un cliente en Windows (fuera de Docker), el broker le dice
+      #     "soy localhost:9092" — correcto, porque así mapeaste el puerto.
+      #   - A un cliente DENTRO de Docker (Kafka-UI), si le dijera
+      #     "localhost", ese contenedor entendería "yo mismo" y no
+      #     encontraría el broker. Por eso el listener INTERNAL anuncia
+      #     el nombre del SERVICIO ("kafka"), que sí es resoluble entre
+      #     contenedores de la misma red de Docker Compose.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
+
+      # Con un solo broker, el factor de replicación de los tópicos internos
+      # de Kafka (offsets, etc.) tiene que ser 1 — no hay a dónde replicar.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      # Quién participa en la elección de "controller" (solo el nodo 1, en
+      # su puerto 9093). Formato: <node_id>@<host>:<puerto_controller>.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-local:9093
+
+      # ID único del "clúster" KRaft. Kafka lo exige para formatear el
+      # almacenamiento la primera vez que arranca; cualquier string base64
+      # válido de 22 caracteres sirve para desarrollo local.
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+
+      # JMX es el mecanismo estándar de Java para exponer métricas de
+      # rendimiento (throughput, bytes in/out, etc.). Sin esto, Kafka-UI
+      # puede ver tópicos y mensajes (eso es protocolo normal de Kafka),
+      # pero su pantalla de "Dashboard" con gráficos de actividad queda
+      # vacía, porque esos gráficos se alimentan específicamente de JMX.
+      # JMX_PORT (sin prefijo KAFKA_) es una variable que lee directamente
+      # el script de arranque del contenedor, no una que se traduzca a
+      # server.properties como las KAFKA_* de arriba.
+      JMX_PORT: 9101
+      # JMX usa RMI por debajo, que necesita saber qué hostname anunciarse
+      # a sí mismo para que un cliente en OTRO contenedor (Kafka-UI) pueda
+      # completar la conexión — mismo principio que KAFKA_ADVERTISED_LISTENERS.
+      KAFKA_OPTS: -Djava.rmi.server.hostname=kafka
+
+  # Interfaz web para VER en vivo lo que pasa en Kafka: tópicos, mensajes
+  # entrando, su contenido JSON, y el offset moviéndose. No participa en
+  # el flujo producer/consumer del test — es solo un "visor" de solo
+  # lectura (aunque también permite publicar mensajes de prueba desde la
+  # UI si quisieras).
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      # localhost:8080 en tu navegador -> puerto 8080 dentro del contenedor.
+      - "8080:8080"
+    environment:
+      # Nombre que verás en la UI para identificar este clúster (es solo
+      # una etiqueta, puede ser cualquier texto).
+      KAFKA_CLUSTERS_0_NAME: local
+
+      # A DÓNDE conectarse: el listener INTERNAL del broker (nombre del
+      # servicio + su puerto interno), no "localhost" — Kafka-UI corre
+      # dentro de la red de Docker, igual que el broker. Ver la
+      # explicación completa arriba, junto a KAFKA_ADVERTISED_LISTENERS.
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      # Dónde encontrar las métricas JMX del broker (ver JMX_PORT arriba).
+      # Con esto, el Dashboard de Kafka-UI muestra gráficos reales de
+      # actividad (bytes in/out por segundo, etc.) en vez de quedar vacío.
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9101
+    depends_on:
+      # Que Docker arranque primero el broker y después Kafka-UI. Esto
+      # NO garantiza que el broker ya esté "listo para recibir conexiones"
+      # (eso tarda unos segundos más incluso después de que el contenedor
+      # arranca) — solo que el contenedor se inicia en ese orden. Por eso
+      # Kafka-UI trae su propia lógica de reintento de conexión.
+      - kafka

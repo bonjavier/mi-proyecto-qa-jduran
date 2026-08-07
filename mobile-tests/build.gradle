@@ -5,7 +5,7 @@ plugins {
     id 'idea'
 }
 
-defaultTasks 'clean', 'test', 'aggregate'
+defaultTasks 'test', 'aggregate'
 
 repositories {
     mavenCentral {
@@ -54,6 +54,14 @@ dependencies {
 test {
     testLogging.showStandardStreams = true
     systemProperties System.getProperties()
+    environment "APP_PATH", System.getenv("APP_PATH") ?: "${projectDir}/2-sauceLabs.apk"
+
+    // Estos tests manejan un emulador/app en vivo vía Appium -- su
+    // resultado depende del estado externo (el emulador, la app, el
+    // dispositivo), no solo del código fuente. Sin esto, Gradle puede
+    // servir un resultado de una corrida anterior desde su caché
+    // (incluso después de "clean") sin tocar el emulador para nada.
+    outputs.upToDateWhen { false }
 }
 
 gradle.startParameter.continueOnFailure = true

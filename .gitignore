@@ -20,8 +20,9 @@ gradle-app.setting
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 
-# Serenity reports
+# Serenity reports and cross-run history (trend graphs, flaky-test detection)
 target/
+history/
 
 # IDE
 .idea/
@@ -35,3 +36,16 @@ target/
 
 # Local Android SDK copy (machine-specific, used only by local pipeline scripts)
 local_sdk/
+
+# k6 reports (generated at runtime)
+api-tests/reports/*
+!api-tests/reports/.gitkeep
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Personal video prep notes (not a deliverable, kept local only)
+GUION_VIDEO.txt
