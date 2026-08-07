@@ -4,19 +4,17 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 
 ```
 .
-├── mobile-tests/         # suite móvil (Java/Screenplay/Serenity/Cucumber)
+├── mobile-tests/          # suite móvil (Java + Screenplay + Serenity + Cucumber + Appium)
+│   ├── gradle/            # wrapper de Gradle
+│   └── src/               # page objects, tasks, step definitions, features (Gherkin)
+├── api-tests/             # suite de API (k6)
 │   ├── src/
-│   ├── build.gradle
-│   ├── gradlew
-│   └── 2-sauceLabs.apk
-├── api-tests/            # suite de API (k6)
-│   ├── run.sh
-│   ├── src/
-│   └── reports/
-└── event-tests/          # bonus: Kafka (Python + Docker)
-    ├── docker-compose.yml
-    ├── schemas/
-    └── test_gps_events.py
+│   │   ├── config/        # BASE_URL, credenciales, SLA -- variables de entorno, nada quemado
+│   │   ├── helpers/       # aserciones reutilizables: status, SLA, schema, headers, reportes
+│   │   └── schemas/       # contratos JSON Schema por endpoint
+│   └── reports/           # reportes HTML/JSON generados al correr la suite
+└── event-tests/           # bonus: Kafka (Python + Docker)
+    └── schemas/           # contrato de datos del evento de telemetría GPS
 ```
 
 > **Atajo para VS Code:** todos los comandos de este README también están disponibles como *tasks* de VS Code (`.vscode/tasks.json`) — `Ctrl+Shift+P` → **"Tasks: Run Task"** → elige la tarea. Incluye una tarea compuesta para Kafka que abre productor y consumidor en dos terminales a la vez. Esto es una comodidad solo para VS Code; los comandos de abajo funcionan en cualquier terminal.
