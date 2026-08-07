@@ -46,3 +46,6 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Personal video prep notes (not a deliverable, kept local only)
+GUION_VIDEO.txt
