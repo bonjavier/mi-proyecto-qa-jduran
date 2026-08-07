@@ -5,7 +5,7 @@ plugins {
     id 'idea'
 }
 
-defaultTasks 'clean', 'test', 'aggregate'
+defaultTasks 'test', 'aggregate'
 
 repositories {
     mavenCentral {
@@ -54,15 +54,14 @@ dependencies {
 test {
     testLogging.showStandardStreams = true
     systemProperties System.getProperties()
-
-    // APP_PATH: si quien corre el build ya definió su propia variable
-    // de entorno APP_PATH, se respeta tal cual. Si no, se calcula un
-    // valor por defecto (el APK que ya viene incluido en este proyecto,
-    // con ruta absoluta calculada por Gradle vía projectDir) -- así el
-    // build funciona clonando el repo y corriendo ./gradlew test sin
-    // configurar nada a mano, sin quemar una ruta fija en el código
-    // (serenity.conf sigue leyendo esto como variable de entorno).
     environment "APP_PATH", System.getenv("APP_PATH") ?: "${projectDir}/2-sauceLabs.apk"
+
+    // Estos tests manejan un emulador/app en vivo vía Appium -- su
+    // resultado depende del estado externo (el emulador, la app, el
+    // dispositivo), no solo del código fuente. Sin esto, Gradle puede
+    // servir un resultado de una corrida anterior desde su caché
+    // (incluso después de "clean") sin tocar el emulador para nada.
+    outputs.upToDateWhen { false }
 }
 
 gradle.startParameter.continueOnFailure = true
