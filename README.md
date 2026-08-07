@@ -1,6 +1,6 @@
 # Mi Proyecto QA — Simon Movilidad
 
-Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screenplay + Serenity BDD + Cucumber + Appium**) y su capa de servicios sobre DummyJSON (**k6**).
+Suite de automatización prueba Automatizador QA (**Java + Screenplay + Serenity BDD + Cucumber + Appium**) y su capa de servicios sobre DummyJSON (**k6**).
 
 ```
 .
@@ -9,15 +9,12 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 │   └── src/test/
 │       ├── java/co/com/simon/
 │       │   ├── interactions/         # acciones custom reutilizables (scroll, drag&drop, tap, esperas)
-│       │   │   └── builders/         # builders fluidos para esas interacciones
 │       │   ├── models/               # enums/modelos de apoyo (direcciones de scroll/drag, coordenadas)
 │       │   ├── questions/            # Screenplay Questions (verificaciones de estado)
 │       │   ├── runners/              # runner de Cucumber (SwaglabsRunner)
 │       │   ├── stepdefinitions/      # mapeo Gherkin -> Java (steps)
 │       │   ├── tasks/                # Screenplay Tasks -- una carpeta por flujo de negocio
-│       │   │   └── (login, addToCard, checkout, withinCard, acceptOrder, orderCompleted, home)
 │       │   └── userinterface/        # Page Objects -- selectores por pantalla
-│       │       └── (login, home, carrito, addToCart, checkout, confirmarcompra, comprarealizada)
 │       └── resources/
 │           └── features/             # escenarios Gherkin (login_swaglabs.feature)
 │
