@@ -4,17 +4,41 @@ Suite de automatización para la app móvil SauceLabs Swag Labs (**Java + Screen
 
 ```
 .
-├── mobile-tests/          # suite móvil (Java + Screenplay + Serenity + Cucumber + Appium)
-│   ├── gradle/            # wrapper de Gradle
-│   └── src/               # page objects, tasks, step definitions, features (Gherkin)
-├── api-tests/             # suite de API (k6)
+├── mobile-tests/                     # suite móvil (Java + Screenplay + Serenity + Cucumber + Appium)
+│   ├── gradle/                       # wrapper de Gradle
+│   └── src/test/
+│       ├── java/co/com/simon/
+│       │   ├── interactions/         # acciones custom reutilizables (scroll, drag&drop, tap, esperas)
+│       │   │   └── builders/         # builders fluidos para esas interacciones
+│       │   ├── models/               # enums/modelos de apoyo (direcciones de scroll/drag, coordenadas)
+│       │   ├── questions/            # Screenplay Questions (verificaciones de estado)
+│       │   ├── runners/              # runner de Cucumber (SwaglabsRunner)
+│       │   ├── stepdefinitions/      # mapeo Gherkin -> Java (steps)
+│       │   ├── tasks/                # Screenplay Tasks -- una carpeta por flujo de negocio
+│       │   │   └── (login, addToCard, checkout, withinCard, acceptOrder, orderCompleted, home)
+│       │   └── userinterface/        # Page Objects -- selectores por pantalla
+│       │       └── (login, home, carrito, addToCart, checkout, confirmarcompra, comprarealizada)
+│       └── resources/
+│           └── features/             # escenarios Gherkin (login_swaglabs.feature)
+│
+├── api-tests/                        # suite de API (k6)
 │   ├── src/
-│   │   ├── config/        # BASE_URL, credenciales, SLA -- variables de entorno, nada quemado
-│   │   ├── helpers/       # aserciones reutilizables: status, SLA, schema, headers, reportes
-│   │   └── schemas/       # contratos JSON Schema por endpoint
-│   └── reports/           # reportes HTML/JSON generados al correr la suite
-└── event-tests/           # bonus: Kafka (Python + Docker)
-    └── schemas/           # contrato de datos del evento de telemetría GPS
+│   │   ├── main-flow.js              # validación funcional: login -> auth user -> user -> crear/actualizar/borrar
+│   │   ├── load-test.js              # prueba de carga sobre los mismos endpoints críticos
+│   │   ├── config/                   # BASE_URL, credenciales, SLA -- variables de entorno, nada quemado
+│   │   ├── helpers/                  # aserciones reutilizables: status, SLA, schema, headers, reportes
+│   │   └── schemas/                  # contratos JSON Schema por endpoint
+│   ├── reports/                      # reportes HTML/JSON generados al correr la suite
+│   └── run.sh                        # orquestador: functional / load / all (condicionado)
+│
+└── event-tests/                      # bonus: Kafka (Python + Docker)
+    ├── docker-compose.yml            # Kafka local (modo KRaft) + Kafka-UI
+    ├── schemas/
+    │   └── telemetry_schema.py       # contrato de datos del evento GPS (JSON Schema)
+    ├── test_gps_events.py            # test oficial: producer + consumer + validaciones (pytest)
+    ├── producer_demo.py              # script demo: publica mensajes a mano o en lote aleatorio
+    ├── consumer_demo.py              # script demo: ver el consumo y su validación en vivo
+    └── quality_report.py             # métricas de QA: calidad de datos + consumer lag
 ```
 
 > **Atajo para VS Code:** todos los comandos de este README también están disponibles como *tasks* de VS Code (`.vscode/tasks.json`) — `Ctrl+Shift+P` → **"Tasks: Run Task"** → elige la tarea. Incluye una tarea compuesta para Kafka que abre productor y consumidor en dos terminales a la vez. Esto es una comodidad solo para VS Code; los comandos de abajo funcionan en cualquier terminal.
